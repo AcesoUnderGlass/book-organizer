@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lighthaven Book Organizer</title>
+<style>
+:root{
+  --bg:#f6f4ef; --panel:#fff; --ink:#222; --muted:#777; --line:#ddd;
+  --accent:#3b6ea5; --ok:#4a9a5a; --warn:#d49b2a; --over:#c0392b;
+  --room:#fbfaf6; --case:#efe6d8; --shelf:#8a6a45;
+}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.35 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column}
+header{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+header h1{font-size:16px;margin:0 12px 0 0}
+button,select,input{font:inherit}
+button{border:1px solid var(--line);background:#fff;border-radius:5px;padding:4px 9px;cursor:pointer}
+button:hover{background:#f0f0f0}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+input,select{border:1px solid var(--line);border-radius:4px;padding:3px 6px;background:#fff}
+main{flex:1;display:flex;min-height:0}
+#sidebar{width:300px;min-width:220px;border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column}
+#sidebar .tools{padding:8px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+#booklist{flex:1;overflow:auto}
+.bookrow{padding:5px 8px;border-bottom:1px solid #f0f0f0;cursor:grab;display:flex;gap:6px;align-items:center}
+.bookrow:hover{background:#f7f9fc}
+.bookrow.sel{background:#e6eef8}
+.bookrow .t{flex:1;min-width:0}
+.bookrow .t b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bookrow .t small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.tag{font-size:11px;padding:0 5px;border-radius:3px;background:#eee;color:#555;white-space:nowrap}
+.tag.cover{background:#fde9c8}
+#center{flex:1;display:flex;flex-direction:column;min-width:0}
+#floorwrap{flex:1;overflow:auto;position:relative;min-height:200px}
+#floor{position:relative;width:2000px;height:1200px;background-image:linear-gradient(#e9e6df 1px,transparent 1px),linear-gradient(90deg,#e9e6df 1px,transparent 1px);background-size:20px 20px}
+.room{position:absolute;background:var(--room);border:2px solid #9c9282;border-radius:4px;display:flex;flex-direction:column}
+.room.drop{outline:3px dashed var(--accent)}
+.room .rh{background:#e8e2d6;padding:3px 6px;font-weight:600;cursor:move;display:flex;justify-content:space-between;align-items:center;user-select:none}
+.room .rh button{padding:0 5px;font-size:12px}
+.room .rb{flex:1;padding:5px;display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start;overflow:auto}
+.room .rz{position:absolute;right:0;bottom:0;width:12px;height:12px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,#9c9282 50%)}
+.casechip{background:var(--case);border:1px solid #c9b89c;border-radius:4px;padding:4px 6px;width:120px;cursor:pointer;font-size:12px}
+.casechip.sel{outline:2px solid var(--accent)}
+.casechip.drop{outline:2px dashed var(--accent)}
+.casechip .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meter{height:6px;background:#ddd;border-radius:3px;overflow:hidden;margin-top:3px}
+.meter i{display:block;height:100%;background:var(--ok)}
+#casepanel{border-top:2px solid var(--line);background:var(--panel);height:46%;min-height:160px;overflow:auto;padding:8px 12px;resize:vertical}
+#casepanel .hd{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.shelf{display:flex;align-items:flex-end;gap:8px;margin-bottom:10px}
+.shelf .lbl{width:92px;font-size:12px;color:var(--muted);flex:none}
+.shelf .lbl input{width:46px;padding:1px 3px}
+.shelfbox{position:relative;border-bottom:6px solid var(--shelf);background:#faf7f1;display:flex;align-items:flex-end;height:110px;flex:none;overflow:visible}
+.shelfbox.drop{background:#e8f0fa}
+.shelfbox .cap{position:absolute;top:-1px;bottom:0;border-right:2px dashed var(--over);pointer-events:none}
+.bk{height:96px;border:1px solid rgba(0,0,0,.25);border-bottom:none;font-size:10px;overflow:hidden;cursor:grab;display:flex;align-items:center;justify-content:center;padding:2px;flex:none;color:#222;position:relative}
+.bk.spine span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:92px}
+.bk.cover{height:100px;font-size:11px;text-align:center;line-height:1.15;border-radius:2px 2px 0 0;box-shadow:inset 0 0 0 3px rgba(255,255,255,.35)}
+.bk.sel{outline:2px solid var(--accent);z-index:2}
+.bk.over{box-shadow:inset 0 -4px 0 var(--over)}
+.insmark{width:3px;height:100px;background:var(--accent);flex:none;margin:0 -1.5px;z-index:3}
+.stat{font-size:12px;color:var(--muted);flex:none;width:110px}
+.stat.over{color:var(--over);font-weight:600}
+#detail{width:300px;border-left:1px solid var(--line);background:var(--panel);padding:10px;overflow:auto}
+#detail h3{margin:0 0 8px;font-size:15px}
+#detail label{display:block;margin:7px 0 2px;font-size:12px;color:var(--muted)}
+#detail input,#detail select{width:100%}
+.row{display:flex;gap:6px}.row>*{flex:1}
+.hint{font-size:12px;color:var(--muted)}
+dialog{border:1px solid var(--line);border-radius:8px;max-width:640px;width:90%}
+dialog textarea{width:100%;height:220px;font:12px monospace}
+.empty{color:var(--muted);padding:20px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>Lighthaven Books</h1>
+  <button id="addRoom">+ Room</button>
+  <button id="importCsv">Import books (CSV/paste)</button>
+  <button id="exportCsv">Export CSV</button>
+  <button id="exportJson">Save JSON</button>
+  <button id="importJson">Load JSON</button>
+  <button id="settingsBtn">Defaults</button>
+  <span class="hint" id="summary"></span>
+</header>
+<main>
+  <section id="sidebar">
+    <div class="tools">
+      <input id="search" placeholder="Search title / author…">
+      <div class="row">
+        <select id="filter">
+          <option value="unassigned">Unassigned</option>
+          <option value="all">All books</option>
+          <option value="assigned">Assigned</option>
+        </select>
+        <button id="addBook">+ Book</button>
+      </div>
+      <div class="hint">Drag books onto shelves or bookcases. Click to edit, double-click a shelved book to flip spine/cover.</div>
+    </div>
+    <div id="booklist"></div>
+  </section>
+  <section id="center">
+    <div id="floorwrap"><div id="floor"></div></div>
+    <div id="casepanel"></div>
+  </section>
+  <aside id="detail"></aside>
+</main>
+
+<dialog id="csvDlg">
+  <h3>Import books</h3>
+  <p class="hint">Paste CSV/TSV (e.g. copied from Google Sheets) or pick a file. Header row required. Recognized columns: <b>title</b>, <b>author</b>, and optionally <b>thickness</b>/spine (in), <b>width</b>/cover width (in), <b>height</b> (in), <b>orientation</b> (spine/cover), <b>bookcase</b>, <b>shelf</b> (number), <b>notes</b>. Other columns are kept as notes.</p>
+  <input type="file" id="csvFile" accept=".csv,.tsv,.txt">
+  <textarea id="csvText" placeholder="title,author&#10;Gödel, Escher, Bach,Douglas Hofstadter"></textarea>
+  <label><input type="checkbox" id="csvReplace"> Replace existing books</label>
+  <div style="text-align:right;margin-top:8px"><button id="csvCancel">Cancel</button> <button class="primary" id="csvGo">Import</button></div>
+</dialog>
+<dialog id="setDlg">
+  <h3>Defaults for books without measurements</h3>
+  <label>Spine thickness (in) <input id="dThick" type="number" step="0.1"></label><br><br>
+  <label>Cover width (in) <input id="dWidth" type="number" step="0.1"></label><br><br>
+  <label>Height (in) <input id="dHeight" type="number" step="0.1"></label>
+  <p class="hint">Books with blank measurements follow these values live.</p>
+  <div style="text-align:right"><button class="primary" id="setOk">Done</button></div>
+</dialog>
+<input type="file" id="jsonFile" accept=".json" hidden>
+
+<script>
+// ---------- state ----------
+const KEY = 'lighthaven-books-v1';
+const uid = () => Math.random().toString(36).slice(2, 10);
+let S, sel = { caseId: null, bookId: null };
+
+function seed() {
+  const r = (name, x, y, w, h) => ({ id: uid(), name, x, y, w, h });
+  const rooms = [r('Library', 20, 20, 380, 260), r('Common Room', 420, 20, 300, 200), r('Hallway', 20, 300, 700, 120)];
+  const shelves = (n, w, h = 11) => Array.from({ length: n }, () => ({ id: uid(), width: w, height: h, books: [] }));
+  const cases = [
+    { id: uid(), name: 'Library A', roomId: rooms[0].id, shelves: shelves(5, 30) },
+    { id: uid(), name: 'Library B', roomId: rooms[0].id, shelves: shelves(5, 30) },
+    { id: uid(), name: 'Common 1', roomId: rooms[1].id, shelves: shelves(4, 34) },
+  ];
+  return { rooms, cases, books: [], defaults: { thickness: 1.2, width: 6, height: 9 } };
+}
+function load() { try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {} if (!S || !S.rooms) S = seed(); }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+function commit() { save(); render(); }
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const bookById = id => S.books.find(b => b.id === id);
+const caseById = id => S.cases.find(c => c.id === id);
+const thick = b => +b.thickness || S.defaults.thickness;
+const cwidth = b => +b.width || S.defaults.width;
+const space = b => b.orientation === 'cover' ? cwidth(b) : thick(b);
+const used = sh => sh.books.reduce((a, id) => a + space(bookById(id)), 0);
+function locate(bookId) {
+  for (const c of S.cases) for (let i = 0; i < c.shelves.length; i++) {
+    const j = c.shelves[i].books.indexOf(bookId);
+    if (j >= 0) return { c, sh: c.shelves[i], si: i, pos: j };
+  }
+  return null;
+}
+function unplace(bookId) { const l = locate(bookId); if (l) l.sh.books.splice(l.pos, 1); }
+function place(bookId, shelf, index) {
+  const l = locate(bookId);
+  if (l && l.sh === shelf && l.pos < index) index--;
+  unplace(bookId);
+  shelf.books.splice(index == null ? shelf.books.length : Math.max(0, Math.min(index, shelf.books.length)), 0, bookId);
+}
+function hue(s) { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; }
+function caseStats(c) {
+  let u = 0, cap = 0, over = 0;
+  for (const sh of c.shelves) { const x = used(sh); u += x; cap += +sh.width; if (x > sh.width) over++; }
+  return { u, cap, over, n: c.shelves.reduce((a, s) => a + s.books.length, 0) };
+}
+const meterColor = f => f > 1 ? 'var(--over)' : f > .9 ? 'var(--warn)' : 'var(--ok)';
+const fmt = x => (Math.round(x * 10) / 10).toString();
+
+// ---------- drag & drop (books) ----------
+let dragBook = null;
+function bookDraggable(el, id) {
+  el.draggable = true;
+  el.addEventListener('dragstart', e => { dragBook = id; e.dataTransfer.setData('text/plain', 'book:' + id); e.dataTransfer.effectAllowed = 'move'; });
+  el.addEventListener('dragend', () => { dragBook = null; clearIns(); });
+}
+function clearIns() { document.querySelectorAll('.insmark').forEach(n => n.remove()); document.querySelectorAll('.drop').forEach(n => n.classList.remove('drop')); }
+
+// ---------- render ----------
+function render() { renderFloor(); renderCase(); renderList(); renderDetail(); renderSummary(); }
+
+function renderSummary() {
+  const placed = S.books.filter(b => locate(b.id)).length;
+  $('#summary').textContent = `${S.books.length} books · ${placed} shelved · ${S.books.length - placed} unassigned · ${S.cases.length} bookcases`;
+}
+
+function renderFloor() {
+  const f = $('#floor'); f.innerHTML = '';
+  for (const r of S.rooms) {
+    const el = document.createElement('div'); el.className = 'room';
+    Object.assign(el.style, { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
+    el.innerHTML = `<div class="rh"><span>${esc(r.name)}</span><span><button data-a="addcase" title="Add bookcase">+ case</button> <button data-a="ren" title="Rename">✎</button> <button data-a="del" title="Delete room">✕</button></span></div><div class="rb"></div><div class="rz"></div>`;
+    const rb = el.querySelector('.rb');
+    for (const c of S.cases.filter(c => c.roomId === r.id)) rb.appendChild(caseChip(c));
+    // room move / resize
+    el.querySelector('.rh').addEventListener('mousedown', e => { if (e.target.tagName !== 'BUTTON') dragRect(e, r, 'move'); });
+    el.querySelector('.rz').addEventListener('mousedown', e => dragRect(e, r, 'size'));
+    el.querySelector('[data-a=addcase]').onclick = () => addCase(r.id);
+    el.querySelector('[data-a=ren]').onclick = () => { const n = prompt('Room name', r.name); if (n) { r.name = n; commit(); } };
+    el.querySelector('[data-a=del]').onclick = () => {
+      const cs = S.cases.filter(c => c.roomId === r.id);
+      if (!confirm(`Delete room "${r.name}"${cs.length ? ` and its ${cs.length} bookcase(s)? Books on them become unassigned.` : '?'}`)) return;
+      S.cases = S.cases.filter(c => c.roomId !== r.id); S.rooms = S.rooms.filter(x => x !== r); commit();
+    };
+    // drop bookcases into room
+    el.addEventListener('dragover', e => { if (dragCase) { e.preventDefault(); el.classList.add('drop'); } });
+    el.addEventListener('dragleave', () => el.classList.remove('drop'));
+    el.addEventListener('drop', e => { if (dragCase) { e.preventDefault(); caseById(dragCase).roomId = r.id; dragCase = null; commit(); } });
+    f.appendChild(el);
+  }
+}
+let dragCase = null;
+function caseChip(c) {
+  const st = caseStats(c), fr = st.cap ? st.u / st.cap : 0;
+  const el = document.createElement('div');
+  el.className = 'casechip' + (sel.caseId === c.id ? ' sel' : '');
+  el.innerHTML = `<div class="nm">${esc(c.name)}</div><div>${st.n} books · ${c.shelves.length} shelves</div>
+    <div>${fmt(st.u)}/${fmt(st.cap)} in${st.over ? ` · <b style="color:var(--over)">${st.over} over</b>` : ''}</div>
+    <div class="meter"><i style="width:${Math.min(100, fr * 100)}%;background:${meterColor(fr)}"></i></div>`;
+  el.onclick = () => { sel.caseId = c.id; render(); };
+  el.draggable = true;
+  el.addEventListener('dragstart', e => { if (dragBook) return; dragCase = c.id; e.dataTransfer.setData('text/plain', 'case:' + c.id); e.stopPropagation(); });
+  el.addEventListener('dragend', () => { dragCase = null; clearIns(); });
+  // dropping a book on a chip: first shelf with room, else last shelf
+  el.addEventListener('dragover', e => { if (dragBook) { e.preventDefault(); e.stopPropagation(); el.classList.add('drop'); } });
+  el.addEventListener('dragleave', () => el.classList.remove('drop'));
+  el.addEventListener('drop', e => {
+    if (!dragBook) return; e.preventDefault(); e.stopPropagation();
+    const b = bookById(dragBook), l = locate(b.id);
+    const sh = c.shelves.find(s => s !== l?.sh && used(s) + space(b) <= s.width) || c.shelves[c.shelves.length - 1];
+    if (sh) place(b.id, sh); dragBook = null; commit();
+  });
+  return el;
+}
+function dragRect(e, r, mode) {
+  e.preventDefault();
+  const sx = e.clientX, sy = e.clientY, o = { ...r };
+  const el = e.target.closest('.room');
+  const mv = ev => {
+    const dx = ev.clientX - sx, dy = ev.clientY - sy, g = v => Math.round(v / 10) * 10;
+    if (mode === 'move') { r.x = Math.max(0, g(o.x + dx)); r.y = Math.max(0, g(o.y + dy)); el.style.left = r.x + 'px'; el.style.top = r.y + 'px'; }
+    else { r.w = Math.max(140, g(o.w + dx)); r.h = Math.max(80, g(o.h + dy)); el.style.width = r.w + 'px'; el.style.height = r.h + 'px'; }
+  };
+  const up = () => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up); save(); };
+  addEventListener('mousemove', mv); addEventListener('mouseup', up);
+}
+
+function renderCase() {
+  const p = $('#casepanel'), c = caseById(sel.caseId);
+  if (!c) { p.innerHTML = '<div class="empty">Click a bookcase above to see its shelves.</div>'; return; }
+  const maxW = Math.max(...c.shelves.map(s => +s.width), 1);
+  const avail = Math.max(300, p.clientWidth - 260);
+  const scale = Math.min(avail / (maxW * 1.15), 28); // px per inch
+  p.innerHTML = `<div class="hd">
+      <input id="cName" value="${esc(c.name)}" style="font-weight:600;width:180px">
+      <select id="cRoom">${S.rooms.map(r => `<option value="${r.id}" ${r.id === c.roomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
+      <button id="cAddShelf">+ shelf</button>
+      <span class="hint">Set all widths: <input id="cAllW" type="number" step="0.5" style="width:60px"> in</span>
+      <input id="cNotes" placeholder="notes (e.g. photo ref)" value="${esc(c.notes || '')}" style="flex:1;min-width:120px">
+      <button id="cDel">Delete case</button>
+    </div><div id="shelves"></div>`;
+  $('#cName').onchange = e => { c.name = e.target.value; commit(); };
+  $('#cRoom').onchange = e => { c.roomId = e.target.value; commit(); };
+  $('#cNotes').onchange = e => { c.notes = e.target.value; save(); };
+  $('#cAddShelf').onclick = () => { const l = c.shelves[c.shelves.length - 1]; c.shelves.push({ id: uid(), width: l ? l.width : 30, height: l ? l.height : 11, books: [] }); commit(); };
+  $('#cAllW').onchange = e => { const v = +e.target.value; if (v > 0) { c.shelves.forEach(s => s.width = v); commit(); } };
+  $('#cDel').onclick = () => { if (confirm(`Delete "${c.name}"? Its books become unassigned.`)) { S.cases = S.cases.filter(x => x !== c); sel.caseId = null; commit(); } };
+
+  const wrap = $('#shelves');
+  c.shelves.forEach((sh, si) => {
+    const u = used(sh), over = u > sh.width;
+    const row = document.createElement('div'); row.className = 'shelf';
+    row.innerHTML = `<div class="lbl">Shelf ${si + 1}<br><input type="number" step="0.5" value="${sh.width}" title="usable width (in)"> in<br>
+      <button data-a="up" title="Move up">↑</button><button data-a="dn" title="Move down">↓</button><button data-a="rm" title="Remove shelf">✕</button></div>`;
+    const box = document.createElement('div'); box.className = 'shelfbox';
+    box.style.width = Math.max(sh.width, u) * scale + 'px';
+    for (const id of sh.books) {
+      const b = bookById(id); if (!b) continue;
+      const el = document.createElement('div');
+      el.className = `bk ${b.orientation === 'cover' ? 'cover' : 'spine'}${sel.bookId === id ? ' sel' : ''}`;
+      el.style.width = space(b) * scale + 'px';
+      const hgt = +b.height || S.defaults.height;
+      el.style.height = Math.min(104, Math.max(50, hgt / 11 * 100)) + 'px';
+      el.style.background = `hsl(${hue(b.title)},45%,${b.orientation === 'cover' ? 82 : 74}%)`;
+      el.title = `${b.title}${b.author ? ' — ' + b.author : ''}\n${b.orientation === 'cover' ? 'cover out' : 'spine out'}, ${fmt(space(b))} in`;
+      el.innerHTML = `<span>${esc(b.title)}</span>`;
+      el.dataset.id = id;
+      el.onclick = e => { e.stopPropagation(); sel.bookId = id; render(); };
+      el.ondblclick = e => { e.stopPropagation(); b.orientation = b.orientation === 'cover' ? 'spine' : 'cover'; commit(); };
+      bookDraggable(el, id);
+      box.appendChild(el);
+    }
+    const capLine = document.createElement('div'); capLine.className = 'cap'; capLine.style.left = '0'; capLine.style.width = sh.width * scale + 'px';
+    if (over) box.appendChild(capLine);
+    // drop with insertion index
+    const idxAt = x => { const bs = [...box.querySelectorAll('.bk')]; for (let i = 0; i < bs.length; i++) { const r = bs[i].getBoundingClientRect(); if (x < r.left + r.width / 2) return i; } return bs.length; };
+    box.addEventListener('dragover', e => {
+      if (!dragBook) return; e.preventDefault(); box.classList.add('drop');
+      const i = idxAt(e.clientX); document.querySelectorAll('.insmark').forEach(n => n.remove());
+      const m = document.createElement('div'); m.className = 'insmark'; const bs = box.querySelectorAll('.bk');
+      bs[i] ? box.insertBefore(m, bs[i]) : box.insertBefore(m, box.querySelector('.cap'));
+    });
+    box.addEventListener('dragleave', e => { if (!box.contains(e.relatedTarget)) { box.classList.remove('drop'); box.querySelectorAll('.insmark').forEach(n => n.remove()); } });
+    box.addEventListener('drop', e => { if (!dragBook) return; e.preventDefault(); const i = idxAt(e.clientX); place(dragBook, sh, i); sel.bookId = dragBook; dragBook = null; commit(); });
+    const stat = document.createElement('div'); stat.className = 'stat' + (over ? ' over' : '');
+    stat.innerHTML = `${sh.books.length} books<br>${fmt(u)} / ${sh.width} in<br>${over ? fmt(u - sh.width) + ' in over' : fmt(sh.width - u) + ' in free'}`;
+    row.appendChild(box); row.appendChild(stat);
+    row.querySelector('input').onchange = e => { sh.width = +e.target.value || sh.width; commit(); };
+    row.querySelector('[data-a=up]').onclick = () => { if (si > 0) { [c.shelves[si - 1], c.shelves[si]] = [c.shelves[si], c.shelves[si - 1]]; commit(); } };
+    row.querySelector('[data-a=dn]').onclick = () => { if (si < c.shelves.length - 1) { [c.shelves[si + 1], c.shelves[si]] = [c.shelves[si], c.shelves[si + 1]]; commit(); } };
+    row.querySelector('[data-a=rm]').onclick = () => { if (!sh.books.length || confirm('Remove shelf? Its books become unassigned.')) { c.shelves.splice(si, 1); commit(); } };
+    wrap.appendChild(row);
+  });
+}
+
+function renderList() {
+  const q = $('#search').value.toLowerCase(), f = $('#filter').value, L = $('#booklist');
+  const items = S.books.filter(b => {
+    const l = locate(b.id);
+    if (f === 'unassigned' && l) return false; if (f === 'assigned' && !l) return false;
+    return !q || (b.title + ' ' + b.author).toLowerCase().includes(q);
+  });
+  L.innerHTML = items.length ? '' : `<div class="empty">${S.books.length ? 'No matches.' : 'No books yet — import a CSV.'}</div>`;
+  for (const b of items.slice(0, 1000)) {
+    const l = locate(b.id), el = document.createElement('div');
+    el.className = 'bookrow' + (sel.bookId === b.id ? ' sel' : '');
+    el.innerHTML = `<div class="t"><b>${esc(b.title)}</b><small>${esc(b.author)}${l ? ' · ' + esc(l.c.name) + ' / ' + (l.si + 1) : ''}</small></div><span class="tag ${b.orientation === 'cover' ? 'cover' : ''}">${b.orientation === 'cover' ? 'cover' : 'spine'}</span>`;
+    el.onclick = () => { sel.bookId = b.id; if (l) sel.caseId = l.c.id; render(); };
+    bookDraggable(el, b.id);
+    L.appendChild(el);
+  }
+  if (items.length > 1000) L.insertAdjacentHTML('beforeend', `<div class="empty">…${items.length - 1000} more; refine search</div>`);
+}
+
+function locOptions() { const o = []; for (const c of S.cases) c.shelves.forEach((s, i) => o.push(`${c.name} / ${i + 1}`)); return o; }
+function parseLoc(str) {
+  const m = String(str).trim().match(/^(.*?)\s*[\/#:,]\s*(\d+)$/); if (!m) return null;
+  const c = S.cases.find(c => c.name.toLowerCase() === m[1].trim().toLowerCase()); if (!c) return null;
+  return c.shelves[+m[2] - 1] || null;
+}
+function renderDetail() {
+  const d = $('#detail'), b = bookById(sel.bookId);
+  if (!b) { d.innerHTML = '<div class="empty">Select a book to edit it.<br><br>Type a location like <code>Library A / 3</code> to shelve it without dragging.</div>'; return; }
+  const l = locate(b.id);
+  d.innerHTML = `<h3>Book</h3>
+    <label>Title</label><input id="bT" value="${esc(b.title)}">
+    <label>Author</label><input id="bA" value="${esc(b.author)}">
+    <label>Orientation</label><select id="bO"><option value="spine">Spine out</option><option value="cover" ${b.orientation === 'cover' ? 'selected' : ''}>Cover out</option></select>
+    <div class="row"><div><label>Spine (in)</label><input id="bTh" type="number" step="0.1" value="${b.thickness ?? ''}" placeholder="${S.defaults.thickness}"></div>
+    <div><label>Cover w (in)</label><input id="bW" type="number" step="0.1" value="${b.width ?? ''}" placeholder="${S.defaults.width}"></div>
+    <div><label>Height (in)</label><input id="bH" type="number" step="0.1" value="${b.height ?? ''}" placeholder="${S.defaults.height}"></div></div>
+    <div class="hint">Takes ${fmt(space(b))} in of shelf.</div>
+    <label>Location (bookcase / shelf #)</label>
+    <input id="bL" list="locs" value="${l ? esc(l.c.name) + ' / ' + (l.si + 1) : ''}" placeholder="unassigned">
+    <datalist id="locs">${locOptions().map(o => `<option value="${esc(o)}">`).join('')}</datalist>
+    <label>Position on shelf (1 = leftmost)</label><input id="bP" type="number" min="1" value="${l ? l.pos + 1 : ''}" ${l ? '' : 'disabled'}>
+    <label>Notes</label><input id="bN" value="${esc(b.notes || '')}">
+    <div style="margin-top:12px;display:flex;gap:6px"><button id="bUn" ${l ? '' : 'disabled'}>Unassign</button><button id="bDel">Delete book</button></div>`;
+  const num = v => v === '' ? null : +v;
+  $('#bT').onchange = e => { b.title = e.target.value; commit(); };
+  $('#bA').onchange = e => { b.author = e.target.value; commit(); };
+  $('#bO').onchange = e => { b.orientation = e.target.value; commit(); };
+  $('#bTh').onchange = e => { b.thickness = num(e.target.value); commit(); };
+  $('#bW').onchange = e => { b.width = num(e.target.value); commit(); };
+  $('#bH').onchange = e => { b.height = num(e.target.value); commit(); };
+  $('#bN').onchange = e => { b.notes = e.target.value; save(); };
+  $('#bL').onchange = e => {
+    const v = e.target.value.trim();
+    if (!v) { unplace(b.id); return commit(); }
+    const sh = parseLoc(v); if (!sh) { e.target.style.borderColor = 'var(--over)'; return; }
+    place(b.id, sh); sel.caseId = locate(b.id).c.id; commit();
+  };
+  $('#bP').onchange = e => { const l = locate(b.id); if (l) { place(b.id, l.sh, +e.target.value - 1 + (+e.target.value - 1 > l.pos ? 1 : 0)); commit(); } };
+  $('#bUn').onclick = () => { unplace(b.id); commit(); };
+  $('#bDel').onclick = () => { if (confirm('Delete this book?')) { unplace(b.id); S.books = S.books.filter(x => x !== b); sel.bookId = null; commit(); } };
+}
+
+// ---------- actions ----------
+function addCase(roomId) {
+  const name = prompt('Bookcase name'); if (!name) return;
+  const n = +prompt('Number of shelves', 5) || 5, w = +prompt('Usable width per shelf (inches)', 30) || 30;
+  const c = { id: uid(), name, roomId, shelves: Array.from({ length: n }, () => ({ id: uid(), width: w, height: 11, books: [] })) };
+  S.cases.push(c); sel.caseId = c.id; commit();
+}
+$('#addRoom').onclick = () => { const n = prompt('Room name'); if (n) { S.rooms.push({ id: uid(), name: n, x: 40, y: 40, w: 300, h: 180 }); commit(); } };
+$('#addBook').onclick = () => { const t = prompt('Title'); if (!t) return; const b = { id: uid(), title: t, author: prompt('Author') || '', orientation: 'spine' }; S.books.push(b); sel.bookId = b.id; commit(); };
+$('#search').oninput = renderList; $('#filter').onchange = renderList;
+
+// CSV
+function parseDelimited(text) {
+  const delim = (text.split('\n')[0].match(/\t/g) || []).length ? '\t' : ',';
+  const rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === delim) { row.push(f); f = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+    else f += ch;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim()));
+}
+function importRows(rows, replace) {
+  const hdr = rows.shift().map(h => h.trim().toLowerCase());
+  const find = (...keys) => hdr.findIndex(h => keys.some(k => h.includes(k)));
+  const ix = { title: find('title', 'name'), author: find('author'), thick: find('thick', 'spine'), width: find('cover w', 'width'), height: find('height'),
+    orient: find('orient', 'facing', 'display'), cs: find('bookcase', 'case'), shelf: find('shelf'), notes: find('note') };
+  if (ix.title < 0) { alert('Need a "title" column.'); return; }
+  if (replace) { S.books = []; S.cases.forEach(c => c.shelves.forEach(s => s.books = [])); }
+  const known = new Set(Object.values(ix).filter(i => i >= 0));
+  let n = 0, placed = 0;
+  for (const r of rows) {
+    const g = i => i >= 0 ? (r[i] || '').trim() : '';
+    if (!g(ix.title)) continue;
+    const extra = hdr.map((h, i) => !known.has(i) && (r[i] || '').trim() ? `${h}: ${r[i].trim()}` : null).filter(Boolean);
+    const b = { id: uid(), title: g(ix.title), author: g(ix.author), thickness: +g(ix.thick) || null, width: +g(ix.width) || null, height: +g(ix.height) || null,
+      orientation: /cover|face/i.test(g(ix.orient)) ? 'cover' : 'spine', notes: [g(ix.notes), ...extra].filter(Boolean).join('; ') };
+    S.books.push(b); n++;
+    if (g(ix.cs)) { const sh = parseLoc(`${g(ix.cs)} / ${g(ix.shelf) || 1}`); if (sh) { sh.books.push(b.id); placed++; } }
+  }
+  commit(); alert(`Imported ${n} books${placed ? `, ${placed} placed on shelves` : ''}.`);
+}
+const csvDlg = $('#csvDlg');
+$('#importCsv').onclick = () => csvDlg.showModal();
+$('#csvCancel').onclick = () => csvDlg.close();
+$('#csvFile').onchange = async e => { const f = e.target.files[0]; if (f) $('#csvText').value = await f.text(); };
+$('#csvGo').onclick = () => { const t = $('#csvText').value; if (!t.trim()) return; csvDlg.close(); importRows(parseDelimited(t), $('#csvReplace').checked); };
+
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+$('#exportCsv').onclick = () => {
+  const q = v => /[",\n]/.test(v = String(v ?? '')) ? `"${v.replace(/"/g, '""')}"` : v;
+  const lines = [['title', 'author', 'orientation', 'room', 'bookcase', 'shelf', 'position', 'thickness', 'width', 'height', 'notes'].join(',')];
+  for (const b of S.books) { const l = locate(b.id), room = l && S.rooms.find(r => r.id === l.c.roomId);
+    lines.push([b.title, b.author, b.orientation, room?.name, l?.c.name, l ? l.si + 1 : '', l ? l.pos + 1 : '', b.thickness, b.width, b.height, b.notes].map(q).join(',')); }
+  download('lighthaven-books.csv', lines.join('\n'), 'text/csv');
+};
+$('#exportJson').onclick = () => download(`lighthaven-books-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(S, null, 1), 'application/json');
+$('#importJson').onclick = () => $('#jsonFile').click();
+$('#jsonFile').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const d = JSON.parse(await f.text()); if (!d.rooms || !d.cases) throw 0; S = d; sel = {}; commit(); } catch (_) { alert('Not a valid save file.'); } e.target.value = ''; };
+$('#settingsBtn').onclick = () => { $('#dThick').value = S.defaults.thickness; $('#dWidth').value = S.defaults.width; $('#dHeight').value = S.defaults.height; $('#setDlg').showModal(); };
+$('#setOk').onclick = () => { S.defaults = { thickness: +$('#dThick').value || 1.2, width: +$('#dWidth').value || 6, height: +$('#dHeight').value || 9 }; $('#setDlg').close(); commit(); };
+document.addEventListener('keydown', e => { if (e.key === 'Delete' && sel.bookId && document.activeElement === document.body) { unplace(sel.bookId); commit(); } });
+addEventListener('resize', renderCase);
+
+// Embedded initial data (replaced when your spreadsheet/photos are loaded in)
+const INITIAL = null;
+load(); if (INITIAL && !localStorage.getItem(KEY)) S = INITIAL; render();
+</script>
+</body>
+</html>
