@@ -32,21 +32,20 @@ main{flex:1;display:flex;min-height:0}
 .tag{font-size:11px;padding:0 5px;border-radius:3px;background:#eee;color:#555;white-space:nowrap}
 .tag.cover{background:#fde9c8}
 #center{flex:1;display:flex;flex-direction:column;min-width:0}
-#floorwrap{flex:1;overflow:auto;position:relative;min-height:200px}
-#floor{position:relative;width:2000px;height:1200px;background-image:linear-gradient(#e9e6df 1px,transparent 1px),linear-gradient(90deg,#e9e6df 1px,transparent 1px);background-size:20px 20px}
-.room{position:absolute;background:var(--room);border:2px solid #9c9282;border-radius:4px;display:flex;flex-direction:column}
+#floorwrap{flex:0 1 auto;overflow:auto;max-height:55%;min-height:80px}
+#floor{display:flex;flex-wrap:wrap;gap:12px;padding:12px;align-items:flex-start}
+.room{background:var(--room);border:2px solid #9c9282;border-radius:4px;display:flex;flex-direction:column;min-width:160px;max-width:100%}
 .room.drop{outline:3px dashed var(--accent)}
-.room .rh{background:#e8e2d6;padding:3px 6px;font-weight:600;cursor:move;display:flex;justify-content:space-between;align-items:center;user-select:none}
+.room .rh{background:#e8e2d6;padding:3px 6px;font-weight:600;display:flex;gap:8px;justify-content:space-between;align-items:center;user-select:none}
 .room .rh button{padding:0 5px;font-size:12px}
-.room .rb{flex:1;padding:5px;display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start;overflow:auto}
-.room .rz{position:absolute;right:0;bottom:0;width:12px;height:12px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,#9c9282 50%)}
+.room .rb{padding:5px;display:flex;flex-wrap:wrap;gap:5px;min-height:40px}
 .casechip{background:var(--case);border:1px solid #c9b89c;border-radius:4px;padding:4px 6px;width:120px;cursor:pointer;font-size:12px}
 .casechip.sel{outline:2px solid var(--accent)}
 .casechip.drop{outline:2px dashed var(--accent)}
 .casechip .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meter{height:6px;background:#ddd;border-radius:3px;overflow:hidden;margin-top:3px}
 .meter i{display:block;height:100%;background:var(--ok)}
-#casepanel{border-top:2px solid var(--line);background:var(--panel);height:46%;min-height:160px;overflow:auto;padding:8px 12px;resize:vertical}
+#casepanel{border-top:2px solid var(--line);background:var(--panel);flex:1;min-height:160px;overflow:auto;padding:8px 12px}
 #casepanel .hd{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
 .shelf{display:flex;align-items:flex-end;gap:8px;margin-bottom:10px}
 .shelf .lbl{width:92px;font-size:12px;color:var(--muted);flex:none}
@@ -109,7 +108,7 @@ dialog textarea{width:100%;height:220px;font:12px monospace}
 
 <dialog id="csvDlg">
   <h3>Import books</h3>
-  <p class="hint">Paste CSV/TSV (e.g. copied from Google Sheets) or pick a file. Header row required. Recognized columns: <b>title</b>, <b>author</b>, and optionally <b>thickness</b>/spine (in), <b>width</b>/cover width (in), <b>height</b> (in), <b>orientation</b> (spine/cover), <b>bookcase</b>, <b>shelf</b> (number), <b>notes</b>. Other columns are kept as notes.</p>
+  <p class="hint">Paste CSV/TSV (e.g. copied from Google Sheets) or pick a file. Header row required. Recognized columns: <b>title</b>, <b>author</b>, and optionally <b>thickness</b>/spine (in), <b>width</b>/cover width (in), <b>height</b> (in), <b>orientation</b> (spine/cover), <b>room</b>, <b>bookcase</b>, <b>shelf</b> (number), <b>notes</b>. Other columns are kept as notes.</p>
   <input type="file" id="csvFile" accept=".csv,.tsv,.txt">
   <textarea id="csvText" placeholder="title,author&#10;Gödel, Escher, Bach,Douglas Hofstadter"></textarea>
   <label><input type="checkbox" id="csvReplace"> Replace existing books</label>
@@ -132,13 +131,13 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 let S, sel = { caseId: null, bookId: null };
 
 function seed() {
-  const r = (name, x, y, w, h) => ({ id: uid(), name, x, y, w, h });
-  const rooms = [r('Library', 20, 20, 380, 260), r('Common Room', 420, 20, 300, 200), r('Hallway', 20, 300, 700, 120)];
+  const r = name => ({ id: uid(), name, placeholder: true });
+  const rooms = [r('Library'), r('Common Room'), r('Hallway')];
   const shelves = (n, w, h = 11) => Array.from({ length: n }, () => ({ id: uid(), width: w, height: h, books: [] }));
   const cases = [
-    { id: uid(), name: 'Library A', roomId: rooms[0].id, shelves: shelves(5, 30) },
-    { id: uid(), name: 'Library B', roomId: rooms[0].id, shelves: shelves(5, 30) },
-    { id: uid(), name: 'Common 1', roomId: rooms[1].id, shelves: shelves(4, 34) },
+    { id: uid(), name: 'Library A', roomId: rooms[0].id, shelves: shelves(5, 30), placeholder: true },
+    { id: uid(), name: 'Library B', roomId: rooms[0].id, shelves: shelves(5, 30), placeholder: true },
+    { id: uid(), name: 'Common 1', roomId: rooms[1].id, shelves: shelves(4, 34), placeholder: true },
   ];
   return { rooms, cases, books: [], defaults: { thickness: 1.2, width: 6, height: 9 } };
 }
@@ -199,13 +198,9 @@ function renderFloor() {
   const f = $('#floor'); f.innerHTML = '';
   for (const r of S.rooms) {
     const el = document.createElement('div'); el.className = 'room';
-    Object.assign(el.style, { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
-    el.innerHTML = `<div class="rh"><span>${esc(r.name)}</span><span><button data-a="addcase" title="Add bookcase">+ case</button> <button data-a="ren" title="Rename">✎</button> <button data-a="del" title="Delete room">✕</button></span></div><div class="rb"></div><div class="rz"></div>`;
+    el.innerHTML = `<div class="rh"><span>${esc(r.name)}</span><span><button data-a="addcase" title="Add bookcase">+ case</button> <button data-a="ren" title="Rename">✎</button> <button data-a="del" title="Delete room">✕</button></span></div><div class="rb"></div>`;
     const rb = el.querySelector('.rb');
     for (const c of S.cases.filter(c => c.roomId === r.id)) rb.appendChild(caseChip(c));
-    // room move / resize
-    el.querySelector('.rh').addEventListener('mousedown', e => { if (e.target.tagName !== 'BUTTON') dragRect(e, r, 'move'); });
-    el.querySelector('.rz').addEventListener('mousedown', e => dragRect(e, r, 'size'));
     el.querySelector('[data-a=addcase]').onclick = () => addCase(r.id);
     el.querySelector('[data-a=ren]').onclick = () => { const n = prompt('Room name', r.name); if (n) { r.name = n; commit(); } };
     el.querySelector('[data-a=del]').onclick = () => {
@@ -243,19 +238,6 @@ function caseChip(c) {
   });
   return el;
 }
-function dragRect(e, r, mode) {
-  e.preventDefault();
-  const sx = e.clientX, sy = e.clientY, o = { ...r };
-  const el = e.target.closest('.room');
-  const mv = ev => {
-    const dx = ev.clientX - sx, dy = ev.clientY - sy, g = v => Math.round(v / 10) * 10;
-    if (mode === 'move') { r.x = Math.max(0, g(o.x + dx)); r.y = Math.max(0, g(o.y + dy)); el.style.left = r.x + 'px'; el.style.top = r.y + 'px'; }
-    else { r.w = Math.max(140, g(o.w + dx)); r.h = Math.max(80, g(o.h + dy)); el.style.width = r.w + 'px'; el.style.height = r.h + 'px'; }
-  };
-  const up = () => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up); save(); };
-  addEventListener('mousemove', mv); addEventListener('mouseup', up);
-}
-
 function renderCase() {
   const p = $('#casepanel'), c = caseById(sel.caseId);
   if (!c) { p.innerHTML = '<div class="empty">Click a bookcase above to see its shelves.</div>'; return; }
@@ -393,7 +375,7 @@ function addCase(roomId) {
   const c = { id: uid(), name, roomId, shelves: Array.from({ length: n }, () => ({ id: uid(), width: w, height: 11, books: [] })) };
   S.cases.push(c); sel.caseId = c.id; commit();
 }
-$('#addRoom').onclick = () => { const n = prompt('Room name'); if (n) { S.rooms.push({ id: uid(), name: n, x: 40, y: 40, w: 300, h: 180 }); commit(); } };
+$('#addRoom').onclick = () => { const n = prompt('Room name'); if (n) { S.rooms.push({ id: uid(), name: n }); commit(); } };
 $('#addBook').onclick = () => { const t = prompt('Title'); if (!t) return; const b = { id: uid(), title: t, author: prompt('Author') || '', orientation: 'spine' }; S.books.push(b); sel.bookId = b.id; commit(); };
 $('#search').oninput = renderList; $('#filter').onchange = renderList;
 
@@ -414,13 +396,28 @@ function parseDelimited(text) {
 }
 function importRows(rows, replace) {
   const hdr = rows.shift().map(h => h.trim().toLowerCase());
-  const find = (...keys) => hdr.findIndex(h => keys.some(k => h.includes(k)));
-  const ix = { title: find('title', 'name'), author: find('author'), thick: find('thick', 'spine'), width: find('cover w', 'width'), height: find('height'),
-    orient: find('orient', 'facing', 'display'), cs: find('bookcase', 'case'), shelf: find('shelf'), notes: find('note') };
+  // claim columns in priority order: exact header match first, then substring
+  const claimed = new Set();
+  const find = (...keys) => {
+    let i = hdr.findIndex((h, k) => !claimed.has(k) && keys.includes(h));
+    if (i < 0) i = hdr.findIndex((h, k) => !claimed.has(k) && keys.some(key => h.includes(key)));
+    if (i >= 0) claimed.add(i); return i;
+  };
+  const ix = {}; ix.cs = find('bookcase', 'case', 'bookshelf'); ix.room = find('room'); ix.shelf = find('shelf');
+  Object.assign(ix, { title: find('title', 'name'), author: find('author'), thick: find('thick', 'spine'), width: find('cover w', 'width'), height: find('height'),
+    orient: find('orient', 'facing', 'display'), notes: find('note') });
   if (ix.title < 0) { alert('Need a "title" column.'); return; }
   if (replace) { S.books = []; S.cases.forEach(c => c.shelves.forEach(s => s.books = [])); }
   const known = new Set(Object.values(ix).filter(i => i >= 0));
-  let n = 0, placed = 0;
+  let n = 0, placed = 0, created = 0;
+  const ensureCase = (name, roomName) => {
+    if (S.cases.some(c => c.name.toLowerCase() === name.toLowerCase())) return;
+    roomName = roomName || 'Unsorted';
+    let room = S.rooms.find(r => r.name.toLowerCase() === roomName.toLowerCase());
+    if (!room) S.rooms.push(room = { id: uid(), name: roomName });
+    S.cases.push({ id: uid(), name, roomId: room.id, shelves: Array.from({ length: 5 }, () => ({ id: uid(), width: 30, height: 11, books: [] })) });
+    created++;
+  };
   for (const r of rows) {
     const g = i => i >= 0 ? (r[i] || '').trim() : '';
     if (!g(ix.title)) continue;
@@ -428,9 +425,14 @@ function importRows(rows, replace) {
     const b = { id: uid(), title: g(ix.title), author: g(ix.author), thickness: +g(ix.thick) || null, width: +g(ix.width) || null, height: +g(ix.height) || null,
       orientation: /cover|face/i.test(g(ix.orient)) ? 'cover' : 'spine', notes: [g(ix.notes), ...extra].filter(Boolean).join('; ') };
     S.books.push(b); n++;
+    if (g(ix.cs)) ensureCase(g(ix.cs), g(ix.room));
     if (g(ix.cs)) { const sh = parseLoc(`${g(ix.cs)} / ${g(ix.shelf) || 1}`); if (sh) { sh.books.push(b.id); placed++; } }
   }
-  commit(); alert(`Imported ${n} books${placed ? `, ${placed} placed on shelves` : ''}.`);
+  if (created) { // spreadsheet defines real rooms/cases: drop untouched sample ones
+    S.cases = S.cases.filter(c => !c.placeholder || caseStats(c).n);
+    S.rooms = S.rooms.filter(r => !r.placeholder || S.cases.some(c => c.roomId === r.id));
+  }
+  commit(); alert(`Imported ${n} books${placed ? `, ${placed} placed on shelves` : ''}${created ? `; created ${created} bookcase(s) with 5×30in placeholder shelves — adjust as needed` : ''}.`);
 }
 const csvDlg = $('#csvDlg');
 $('#importCsv').onclick = () => csvDlg.showModal();
