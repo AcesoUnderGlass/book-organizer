@@ -42,6 +42,7 @@ main{flex:1;display:flex;min-height:0}
 .casechip{background:var(--case);border:1px solid #c9b89c;border-radius:4px;padding:4px 6px;width:120px;cursor:pointer;font-size:12px}
 .casechip.sel{outline:2px solid var(--accent)}
 .casechip.ph{border-style:dashed}
+.casechip.photo{border-width:2px;border-color:#8a6a45}
 .room.slush{border-style:dashed;cursor:pointer}
 .room.slush .rb{font-size:13px;color:var(--muted)}
 .casechip.drop{outline:2px dashed var(--accent)}
@@ -235,7 +236,8 @@ let dragCase = null;
 function caseChip(c) {
   const st = caseStats(c), fr = st.cap ? st.u / st.cap : 0;
   const el = document.createElement('div');
-  el.className = 'casechip' + (sel.caseId === c.id ? ' sel' : '') + (c.placeholder ? ' ph' : '');
+  el.className = 'casechip' + (sel.caseId === c.id ? ' sel' : '') + (c.placeholder ? ' ph' : '') + (c.photo ? ' photo' : '');
+  if (c.photo) el.title = 'From photo (shelf widths estimated): ' + (c.notes || '');
   if (c.placeholder) el.title = 'Placeholder bookcase (no photo yet) — edit shelves to match reality';
   el.innerHTML = `<div class="nm">${esc(c.name)}</div><div>${st.n} books · ${c.shelves.length} shelves</div>
     <div>${fmt(st.u)}/${fmt(st.cap)} in${st.over ? ` · <b style="color:var(--over)">${st.over} over</b>` : ''}</div>
@@ -469,6 +471,9 @@ function importRows(rows, replace, quiet) {
     } else if (g(ix.room)) {
       const room = roomByName(normRoom(g(ix.room)));
       if (!toShelve.has(room)) toShelve.set(room, []); toShelve.get(room).push(b);
+    } else if (fixtureForCurrent(b.current)) { // no planned move: leave it where it physically is
+      const c = fixtureForCurrent(b.current);
+      (c.shelves.find(s => used(s) + space(b) <= s.width) || c.shelves[c.shelves.length - 1]).books.push(b.id); placed++;
     }
   }
   for (const [room, bs] of toShelve) { created += autoShelve(room, bs); placed += bs.length; }
@@ -481,6 +486,37 @@ function importRows(rows, replace, quiet) {
 }
 // "Storage? (Dupe)" -> "Storage"
 const normRoom = name => name.replace(/\?.*$/, '').trim() || name;
+
+// ---------- real bookcases, measured by eye from photos (Nov 2026) ----------
+// Widths are ESTIMATES (usable inches per shelf) — correct them in the shelf editor once measured.
+// Spine towers / tree shelf: books stack or lean, so each "shelf" is a stack/slot and its "width" is how many inches of spine fit.
+// `current` = values of the sheet's "Current Location" column for books already sitting on this case.
+const PHOTO_ROOM = 'Photographed (room TBD)';
+const FIXTURES = [
+  { id: 'fx-black-tower', name: 'Black spine tower', room: PHOTO_ROOM, shelves: Array(12).fill(5.5), current: ['Black spine tower'],
+    notes: 'Photo: black spine tower next to the wooden hall tree / keypad door. 12 stacks × ~5.5in (est., ~6ft tall).' },
+  { id: 'fx-tall-tower', name: 'Building A tall tower', room: 'Building A', shelves: Array(12).fill(5.5), current: ['Building A shelf – tall tower (Photos 2–3)'],
+    notes: 'Photo: black spine tower beside the loveseat, next to the tree shelf. 12 stacks × ~5.5in (est.).' },
+  { id: 'fx-tree', name: 'Tree shelf (rainbow)', room: 'Building A', shelves: Array(8).fill(12),
+    notes: 'Photo: wooden zigzag "tree" shelf with color-sorted paperbacks, beside the tall tower. 8 V-slots × ~12in (est.); current contents not in sheet.' },
+  { id: 'fx-teak', name: 'Teak corner cabinet', room: PHOTO_ROOM, shelves: [24, 24, 24], current: ['Teak corner cabinet'],
+    notes: 'Photo: piano room, next to grandfather clock. Glass-door shelf, open shelf, closed cupboard (~24in each, est.).' },
+  { id: 'fx-curio', name: 'Curio cabinet', room: PHOTO_ROOM, shelves: [28, 28, 28, 28, 28], current: ['Curio cabinet'],
+    notes: 'Photo: bow-front glass curio between paper floor lamps. 5 levels (~28in, est.); top two hold bottles + big hourglass.' },
+  { id: 'fx-ladder', name: 'White ladder shelf', room: PHOTO_ROOM, shelves: [38, 38, 38, 38],
+    notes: 'Photo: A-frame ladder shelf in ornate plaster-ceiling hall by the stairs. 4 shelves × ~38in (est.); currently decor only.' },
+];
+function addFixtures() { // adds any missing photographed cases (empty); never moves existing books
+  for (const f of FIXTURES) {
+    if (caseById(f.id)) continue;
+    let room = S.rooms.find(r => r.name.toLowerCase() === f.room.toLowerCase());
+    if (!room) S.rooms.push(room = { id: uid(), name: f.room });
+    S.cases.push({ id: f.id, name: f.name, roomId: room.id, notes: f.notes, photo: true,
+      shelves: f.shelves.map((w, i) => ({ id: `${f.id}-${i}`, width: w, height: 11, books: [] })) });
+  }
+}
+// Case whose sheet "Current Location" matches, if it's a photographed one
+const fixtureForCurrent = cur => { const f = cur && FIXTURES.find(f => (f.current || []).includes(cur)); return f && caseById(f.id); };
 // Fill a room's bookcases in category/author order, leaving ~15% slack per shelf; adds placeholder cases as needed.
 function autoShelve(room, books) {
   const coll = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
@@ -527,10 +563,10 @@ addEventListener('resize', renderCase);
 
 // Embedded initial data (replaced when your spreadsheet/photos are loaded in)
 const SHEET = JSON.parse(document.getElementById('sheet-data').textContent || 'null');
-function fromSheet() { S = { rooms: [], cases: [], books: [], defaults: S?.defaults || { thickness: 1.2, width: 6, height: 9 } }; sel = {}; importRows(SHEET, true, true); }
+function fromSheet() { S = { rooms: [], cases: [], books: [], defaults: S?.defaults || { thickness: 1.2, width: 6, height: 9 } }; sel = {}; addFixtures(); importRows(SHEET, true, true); }
 $('#resetBtn').onclick = () => { if (confirm('Discard all changes and rebuild from the spreadsheet snapshot embedded in this file? (Save JSON first if unsure.)')) fromSheet(); };
 let stored = null; try { stored = localStorage.getItem(KEY); } catch (e) {}
-if (!stored && SHEET) fromSheet(); else { load(); render(); }
+if (!stored && SHEET) fromSheet(); else { load(); addFixtures(); save(); render(); }
 </script>
 </body>
 </html>
